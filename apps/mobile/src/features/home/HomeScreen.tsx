@@ -42,7 +42,6 @@ import type { WorkspaceEnvironment, WorkspaceState } from "../../state/workspace
 import type { SavedRemoteConnection } from "../../lib/connection";
 import { scopedProjectKey, scopedThreadKey } from "../../lib/scopedEntities";
 import { NativePrimaryColumnContext } from "../../native/v5-workspace-context";
-import { useNativeColumnLayoutMetrics } from "../layout/native-layout-metrics";
 import { NATIVE_LIQUID_GLASS_SUPPORTED } from "../../native/native-glass";
 import { NATIVE_WORKSPACE_COLUMNS_SUPPORTED } from "../../native/NativeWorkspaceColumns";
 import {
@@ -285,7 +284,6 @@ export function HomeScreen(props: HomeScreenProps) {
   const openSwipeableRef = useRef<SwipeableMethods | null>(null);
   const listRef = useRef<LegendListRef | null>(null);
   const insets = useSafeAreaInsets();
-  const columnMetrics = useNativeColumnLayoutMetrics();
   const screenMetrics = useNativeLayoutMetrics();
   const contentSideInsets = NATIVE_WORKSPACE_COLUMNS_SUPPORTED
     ? (columnMetrics ?? screenMetrics)?.safeArea
