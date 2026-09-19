@@ -343,12 +343,13 @@ diff --git a/ios/header/RNSHeaderItemComponentView.mm b/ios/header/RNSHeaderItem
  
  - (nullable UIView *)customView
  {
-@@ -178,7 +193,7 @@
+@@ -178,7 +193,8 @@
    const auto &newItemProps = *std::static_pointer_cast<const react::RNSHeaderItemIOSProps>(props);
    const auto &oldItemProps = *std::static_pointer_cast<const react::RNSHeaderItemIOSProps>(_props);
  
 -  BOOL needsUpdate = NO;
-+  BOOL needsUpdate = oldItemProps.searchBarPlacement != newItemProps.searchBarPlacement;
++  BOOL needsUpdate = oldItemProps.searchBarPlacement != newItemProps.searchBarPlacement ||
++      oldItemProps.axisBehavior != newItemProps.axisBehavior;
    BOOL menuDidChange = NO;
  
    if (oldItemProps.itemId != newItemProps.itemId) {
