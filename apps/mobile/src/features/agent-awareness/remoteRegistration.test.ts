@@ -579,6 +579,76 @@ describe("makeRelayDeviceRegistrationRequest", () => {
     expect(widgetMocks.start).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["preferences", "sign-out"],
+    ["preferences", "account change"],
+    ["preferences", "provider teardown"],
+    ["cleanup", "sign-out"],
+    ["cleanup", "account change"],
+    ["cleanup", "provider teardown"],
+  ])("cancels local arming pending %s after %s", async (pendingStep, sessionChange) => {
+    const resume = Promise.withResolvers<void>();
+    const paused = Promise.withResolvers<void>();
+    const preferences = { liveActivitiesEnabled: true } as Preferences;
+    setAgentAwarenessRelayTokenProvider(() => Promise.resolve("token-a"), "user-a");
+    if (pendingStep === "preferences") {
+      vi.mocked(loadPreferences).mockImplementationOnce(async () => {
+        paused.resolve();
+        await resume.promise;
+        return preferences;
+      });
+    } else {
+      vi.mocked(loadPreferences).mockResolvedValueOnce(preferences);
+      widgetMocks.dismissEndedInstances.mockImplementationOnce(() => {
+        paused.resolve();
+        return resume.promise;
+      });
+    }
+
+    const arming = armAgentAwarenessLiveActivityForLocalWork({
+      environmentId: "env-1" as EnvironmentId,
+      threadTitle: "Private work",
+      projectTitle: "Private project",
+    });
+    await paused.promise;
+    if (sessionChange === "sign-out") {
+      setAgentAwarenessRelayTokenProvider(null);
+    } else if (sessionChange === "account change") {
+      setAgentAwarenessRelayTokenProvider(() => Promise.resolve("token-b"), "user-b");
+    } else {
+      releaseAgentAwarenessRelayTokenProvider();
+    }
+    resume.resolve();
+    await arming;
+
+    expect(widgetMocks.start).not.toHaveBeenCalled();
+  });
+
+  it("still arms local work after a same-account token refresh during cleanup", async () => {
+    const cleanup = Promise.withResolvers<void>();
+    const cleanupStarted = Promise.withResolvers<void>();
+    widgetMocks.dismissEndedInstances.mockImplementationOnce(() => {
+      cleanupStarted.resolve();
+      return cleanup.promise;
+    });
+    setAgentAwarenessRelayTokenProvider(() => Promise.resolve("token-a"), "user-a");
+    vi.mocked(loadPreferences).mockResolvedValueOnce({
+      liveActivitiesEnabled: true,
+    } as Preferences);
+
+    const arming = armAgentAwarenessLiveActivityForLocalWork({
+      environmentId: "env-1" as EnvironmentId,
+      threadTitle: "New work",
+      projectTitle: "t3code",
+    });
+    await cleanupStarted.promise;
+    setAgentAwarenessRelayTokenProvider(() => Promise.resolve("refreshed-token-a"), "user-a");
+    cleanup.resolve();
+    await arming;
+
+    expect(widgetMocks.start).toHaveBeenCalledOnce();
+  });
+
   it.effect(
     "re-registers active Live Activity tokens when the app returns to the foreground",
     () => {

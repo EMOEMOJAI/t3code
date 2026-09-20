@@ -498,11 +498,11 @@ function environmentPublishesAgentActivity(environmentId: EnvironmentId): boolea
 // aggregate within seconds. No-ops when a card is already armed, and skips
 // environments that report publishing disabled — the seed would sit on
 // "Connecting" forever with no update ever arriving to repaint or end it.
-export function armAgentAwarenessLiveActivityForLocalWork(input: {
+export async function armAgentAwarenessLiveActivityForLocalWork(input: {
   readonly environmentId: EnvironmentId;
   readonly threadTitle: string;
   readonly projectTitle: string;
-}): void {
+}): Promise<void> {
   if (!canRegisterRemoteLiveActivities() || !relayTokenProvider) {
     return;
   }
@@ -512,22 +512,28 @@ export function armAgentAwarenessLiveActivityForLocalWork(input: {
     });
     return;
   }
-  void loadPreferences()
-    .catch(() => null)
-    .then((preferences) => {
-      if (preferences?.liveActivitiesEnabled === false) {
-        return;
-      }
-      return armAgentAwarenessLiveActivityForLocalWorkNow(input);
-    });
+  const generation = deviceRegistrationGeneration;
+  const preferences = await loadPreferences().catch(() => null);
+  if (preferences?.liveActivitiesEnabled === false || generation !== deviceRegistrationGeneration) {
+    return;
+  }
+  await armAgentAwarenessLiveActivityForLocalWorkNow(input, generation);
 }
 
-async function armAgentAwarenessLiveActivityForLocalWorkNow(input: {
-  readonly threadTitle: string;
-  readonly projectTitle: string;
-}): Promise<void> {
+async function armAgentAwarenessLiveActivityForLocalWorkNow(
+  input: {
+    readonly threadTitle: string;
+    readonly projectTitle: string;
+  },
+  expectedGeneration: number,
+): Promise<void> {
   try {
     await dismissEndedLocalLiveActivities();
+    // Sign-out or an account change may have happened while native cleanup ran.
+    // The old session must not leave a new card that its relay can no longer end.
+    if (expectedGeneration !== deviceRegistrationGeneration) {
+      return;
+    }
     if (getAgentLiveActivities().length > 0) {
       return;
     }
