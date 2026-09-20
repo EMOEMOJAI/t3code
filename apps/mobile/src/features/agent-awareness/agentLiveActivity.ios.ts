@@ -1,5 +1,9 @@
 import AgentActivity, { type AgentActivityProps } from "../../widgets/AgentActivity";
 
+export function dismissEndedAgentLiveActivities(): Promise<void> {
+  return AgentActivity.dismissEndedInstances();
+}
+
 export function getAgentLiveActivities() {
   return AgentActivity.getInstances();
 }

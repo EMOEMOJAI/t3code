@@ -36,7 +36,11 @@ import {
   saveAgentAwarenessRegistrationRecord,
 } from "../../persistence/imperative";
 import type { AgentActivityProps } from "../../widgets/AgentActivity";
-import { getAgentLiveActivities, startAgentLiveActivity } from "./agentLiveActivity";
+import {
+  dismissEndedAgentLiveActivities,
+  getAgentLiveActivities,
+  startAgentLiveActivity,
+} from "./agentLiveActivity";
 import { resolveCloudPublicConfig } from "../cloud/publicConfig";
 import { supportsAgentAwarenessPush } from "./capabilities";
 import { makeRelayDeviceRegistrationRequest, resolveApsEnvironment } from "./registrationPayload";
@@ -514,15 +518,16 @@ export function armAgentAwarenessLiveActivityForLocalWork(input: {
       if (preferences?.liveActivitiesEnabled === false) {
         return;
       }
-      armAgentAwarenessLiveActivityForLocalWorkNow(input);
+      return armAgentAwarenessLiveActivityForLocalWorkNow(input);
     });
 }
 
-function armAgentAwarenessLiveActivityForLocalWorkNow(input: {
+async function armAgentAwarenessLiveActivityForLocalWorkNow(input: {
   readonly threadTitle: string;
   readonly projectTitle: string;
-}): void {
+}): Promise<void> {
   try {
+    await dismissEndedLocalLiveActivities();
     if (getAgentLiveActivities().length > 0) {
       return;
     }
@@ -841,10 +846,21 @@ function ensureAppStateListener(): void {
   });
 }
 
+// getInstances() only exposes active/stale cards. An ended card may still be
+// visible on the Lock Screen, so it needs a separate native dismissal pass.
+async function dismissEndedLocalLiveActivities(): Promise<void> {
+  try {
+    await dismissEndedAgentLiveActivities();
+  } catch (error) {
+    logRegistrationError("ended live activity cleanup failed", error);
+  }
+}
+
 function endLocalLiveActivities(context: string): void {
   if (!canRegisterRemoteLiveActivities()) {
     return;
   }
+  void dismissEndedLocalLiveActivities();
   try {
     for (const activity of getAgentLiveActivities()) {
       activity.end("immediate").catch((error: unknown) => {
@@ -1071,6 +1087,8 @@ export function refreshActiveLiveActivityRemoteRegistration(): Effect.Effect<
     if (!canRegisterRemoteLiveActivities() || !relayTokenProvider) {
       return;
     }
+
+    yield* Effect.promise(dismissEndedLocalLiveActivities);
 
     let activities = yield* Effect.try({
       try: () => getAgentLiveActivities(),
