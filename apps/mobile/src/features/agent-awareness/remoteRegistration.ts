@@ -491,13 +491,12 @@ function environmentPublishesAgentActivity(environmentId: EnvironmentId): boolea
   );
 }
 
-// Arms the lock-screen card the moment the user starts agent work from this
-// phone, while the app is still foregrounded and the fresh activity's token
-// can be registered immediately. The seeded row is a best-effort placeholder;
-// the relay's registration replay repaints it with the authoritative
-// aggregate within seconds. No-ops when a card is already armed, and skips
-// environments that report publishing disabled — the seed would sit on
-// "Connecting" forever with no update ever arriving to repaint or end it.
+/**
+ * Arms a foreground card for local work; relay registration replaces its placeholder
+ * with the current aggregate. Skips disabled preferences, existing cards, and
+ * environments that cannot publish updates. Session changes cancel pending arming.
+ * Resolves after the arming attempt; token registration continues in the background.
+ */
 export async function armAgentAwarenessLiveActivityForLocalWork(input: {
   readonly environmentId: EnvironmentId;
   readonly threadTitle: string;
@@ -520,6 +519,10 @@ export async function armAgentAwarenessLiveActivityForLocalWork(input: {
   await armAgentAwarenessLiveActivityForLocalWorkNow(input, generation);
 }
 
+/**
+ * Removes ended cards before seeding local work for the captured session generation.
+ * Rechecks the session and existing cards after cleanup to avoid orphaned or duplicate cards.
+ */
 async function armAgentAwarenessLiveActivityForLocalWorkNow(
   input: {
     readonly threadTitle: string;
@@ -852,8 +855,10 @@ function ensureAppStateListener(): void {
   });
 }
 
-// getInstances() only exposes active/stale cards. An ended card may still be
-// visible on the Lock Screen, so it needs a separate native dismissal pass.
+/**
+ * Dismisses ended cards hidden by getInstances() but still visible on the Lock Screen.
+ * Logs native cleanup failures so active-card registration can continue.
+ */
 async function dismissEndedLocalLiveActivities(): Promise<void> {
   try {
     await dismissEndedAgentLiveActivities();
@@ -862,6 +867,7 @@ async function dismissEndedLocalLiveActivities(): Promise<void> {
   }
 }
 
+/** Starts best-effort dismissal of ended and live cards on sign-out, logging failures with context. */
 function endLocalLiveActivities(context: string): void {
   if (!canRegisterRemoteLiveActivities()) {
     return;
@@ -1084,6 +1090,10 @@ function scheduleActiveLiveActivityRegistrationRetry(): void {
   }, REMOTE_ACTIVITY_REGISTRATION_RETRY_MS);
 }
 
+/**
+ * Reconciles foreground iOS cards with the relay after dismissing ended cards.
+ * Keeps one live card, primes it from current work when needed, and registers its update token.
+ */
 export function refreshActiveLiveActivityRemoteRegistration(): Effect.Effect<
   void,
   never,
