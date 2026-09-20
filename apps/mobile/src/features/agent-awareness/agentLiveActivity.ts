@@ -6,10 +6,12 @@ export function dismissEndedAgentLiveActivities(): Promise<void> {
   return Promise.resolve();
 }
 
+/** Returns no cards on platforms without iOS Live Activity support. */
 export function getAgentLiveActivities(): Array<LiveActivity<AgentActivityProps>> {
   return [];
 }
 
+/** Returns null without creating a card on platforms without iOS Live Activity support. */
 export function startAgentLiveActivity(
   _props: AgentActivityProps,
 ): LiveActivity<AgentActivityProps> | null {
